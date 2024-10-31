@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { UserCircle, Mail, ArrowRight, Shield } from 'lucide-react';
+import { UserCircle, Mail, ArrowRight, Shield, Loader2 } from 'lucide-react';
 
 const LoginForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({ name: '', email: '' });
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
@@ -18,15 +19,19 @@ const LoginForm = ({ onSubmit }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      setIsLoading(true);
+      try {
+        await onSubmit(formData);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   return (
-    
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -50,7 +55,7 @@ const LoginForm = ({ onSubmit }) => {
       <form onSubmit={handleSubmit} className="w-full space-y-4">
         <div>
           <motion.div
-            whileHover={{ scale: 1.01 }}
+            whileHover={!isLoading ? { scale: 1.01 } : {}}
             className="relative"
           >
             <UserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -59,8 +64,10 @@ const LoginForm = ({ onSubmit }) => {
               placeholder="Your name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              disabled={isLoading}
               className="w-full p-4 pl-12 rounded-xl bg-white/10 text-white placeholder:text-gray-400 
-                        focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                        focus:outline-none focus:ring-2 focus:ring-green-500 transition-all
+                        disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </motion.div>
           {errors.name && (
@@ -76,7 +83,7 @@ const LoginForm = ({ onSubmit }) => {
 
         <div>
           <motion.div
-            whileHover={{ scale: 1.01 }}
+            whileHover={!isLoading ? { scale: 1.01 } : {}}
             className="relative"
           >
             <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -85,8 +92,10 @@ const LoginForm = ({ onSubmit }) => {
               placeholder="Your email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              disabled={isLoading}
               className="w-full p-4 pl-12 rounded-xl bg-white/10 text-white placeholder:text-gray-400 
-                        focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                        focus:outline-none focus:ring-2 focus:ring-green-500 transition-all
+                        disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </motion.div>
           {errors.email && (
@@ -102,14 +111,25 @@ const LoginForm = ({ onSubmit }) => {
 
         <motion.button
           type="submit"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          disabled={isLoading}
+          whileHover={!isLoading ? { scale: 1.02 } : {}}
+          whileTap={!isLoading ? { scale: 0.98 } : {}}
           className="w-full p-4 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-500 
                     text-white shadow-lg hover:shadow-green-500/20 transition-all duration-300
-                    flex items-center justify-center gap-2"
+                    flex items-center justify-center gap-2
+                    disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Continue
-          <ArrowRight size={20} className="animate-pulse" />
+          {isLoading ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              <span>Processing...</span>
+            </>
+          ) : (
+            <>
+              Continue
+              <ArrowRight size={20} className="animate-pulse" />
+            </>
+          )}
         </motion.button>
 
         <motion.div 

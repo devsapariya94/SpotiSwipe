@@ -12,6 +12,7 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSwipeLoading, setIsSwipeLoading] = useState(false);
   const controls = useAnimation();
   const cardRef = useRef(null);
   const audioRef = useRef(null);
@@ -162,6 +163,7 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
     
     try {
       setIsAnimating(true);
+      setIsSwipeLoading(true);
       
       if (audioRef.current) {
         const fadeOut = setInterval(() => {
@@ -206,12 +208,22 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
       controls.set({ x: 0, rotate: 0, opacity: 1 });
     } finally {
       setIsAnimating(false);
+      // Keep loading state active until new song loads
     }
   };
+
+  // Add effect to reset swipe loading state when new song loads
+  useEffect(() => {
+    if (song) {
+      setIsSwipeLoading(false);
+    }
+  }, [song]);
 
   if (!song) {
     return null;
   }
+
+
 
   return (
     <div className="relative w-full max-w-md mx-auto">
@@ -371,6 +383,12 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
               )}
             </div>
           </motion.div>
+          {(isLoading && previewUrl) || isSwipeLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-20">
+              <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : null}
+
         </div>
 
         {/* Preference Overlays */}
