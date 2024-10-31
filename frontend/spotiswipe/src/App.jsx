@@ -1,17 +1,15 @@
-"use client"
-
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Heart, Github, Linkedin, Mail } from 'lucide-react'
+import ReactGA from 'react-ga4'
 import Loading from './components/Loading'
 import LoginForm from './components/LoginForm'
 import GenreSelection from './components/GenreSelection'
 import SongCard from './components/SongCard'
 import Recommendations from './components/Recommendations'
 
-
-import ReactGA from 'react-ga4';
-ReactGA.initialize('G-SKM6JZG57Z');
+// Initialize GA4
+ReactGA.initialize('G-SKM6JZG57Z')
 
 export default function App() {
   const [step, setStep] = useState('registration')
@@ -22,6 +20,19 @@ export default function App() {
   const [recommendations, setRecommendations] = useState([])
 
   const baseUrl = 'https://backend.spotiswipe.devsdemo.co/'
+
+  // Track page views and steps
+  useEffect(() => {
+    // Send initial pageview
+    ReactGA.send({ hitType: "pageview", page: "/" });
+
+    // Track step changes
+    ReactGA.event({
+      category: 'User Flow',
+      action: 'Step Change',
+      label: step
+    });
+  }, [step]);
 
   const handleRegistration = async (data) => {
     try {
@@ -35,17 +46,39 @@ export default function App() {
       
       if (!response.ok) throw new Error(responseData.error || 'Registration failed')
       
+      // Track successful registration
+      ReactGA.event({
+        category: 'User',
+        action: 'Registration',
+        label: 'Success'
+      });
+
       setSessionId(responseData.session_id)
       setUserData(data)
       setStep('genres')
     } catch (error) {
       console.error('Error during registration:', error)
+      
+      // Track registration error
+      ReactGA.event({
+        category: 'Error',
+        action: 'Registration Failed',
+        label: error.message
+      });
+
       alert(error.message)
     }
   }
 
   const handleStart = async (selectedGenres) => {
     try {
+      // Track genre selection
+      ReactGA.event({
+        category: 'User Preferences',
+        action: 'Genre Selection',
+        label: selectedGenres.join(', ')
+      });
+
       const response = await fetch(`${baseUrl}/api/initial-songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,6 +96,14 @@ export default function App() {
       setStep('swiping')
     } catch (error) {
       console.error('Error starting session:', error)
+      
+      // Track error
+      ReactGA.event({
+        category: 'Error',
+        action: 'Session Start Failed',
+        label: error.message
+      });
+
       alert(error.message)
     }
   }
@@ -76,6 +117,14 @@ export default function App() {
       if (!currentSong?.track_id) {
         throw new Error('Invalid song data')
       }
+
+      // Track swipe action
+      ReactGA.event({
+        category: 'User Interaction',
+        action: 'Song Swipe',
+        label: liked ? 'Like' : 'Dislike',
+        value: currentSongIndex + 1
+      });
 
       const response = await fetch(`${baseUrl}/api/swipe`, {
         method: 'POST',
@@ -101,6 +150,14 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error handling swipe:', error)
+      
+      // Track swipe error
+      ReactGA.event({
+        category: 'Error',
+        action: 'Swipe Failed',
+        label: error.message
+      });
+
       alert(`Error recording your choice: ${error.message}`)
     }
   }
@@ -127,16 +184,37 @@ export default function App() {
         throw new Error('Invalid recommendations data received')
       }
 
+      // Track successful recommendations
+      ReactGA.event({
+        category: 'User Flow',
+        action: 'Recommendations Generated',
+        value: data.recommendations.length
+      });
+
       setRecommendations(data.recommendations)
       setStep('recommendations')
     } catch (error) {
       console.error('Error getting recommendations:', error)
+      
+      // Track recommendations error
+      ReactGA.event({
+        category: 'Error',
+        action: 'Recommendations Failed',
+        label: error.message
+      });
+
       alert(`Failed to get recommendations: ${error.message}`)
       handleRestart()
     }
   }
 
   const handleRestart = () => {
+    // Track restart action
+    ReactGA.event({
+      category: 'User Flow',
+      action: 'Restart App'
+    });
+
     setStep('genres')
     setSessionId(null)
     setSongs([])
@@ -144,7 +222,9 @@ export default function App() {
     setRecommendations([])
   }
 
+
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-950">
       <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 md:py-12 lg:px-8 lg:py-16">
       <motion.div
