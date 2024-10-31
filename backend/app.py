@@ -18,17 +18,16 @@ app = Flask(__name__)
 
 CORS(app, resources={
     r"/*": {
-        "origins": "*",  # Allow all origins
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Allow all common HTTP methods
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
         "expose_headers": ["Content-Range", "X-Content-Range"],
-        "supports_credentials": True,  # Allow credentials (cookies, authorization headers)
-        "max_age": 600,  # Cache preflight requests for 10 minutes
-        "send_wildcard": False  # For better security with credentials
+        "supports_credentials": True,
+        "max_age": 600,
+        "send_wildcard": False
     }
 })
 
-# Optional: Add CORS headers to specific routes if needed
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -36,11 +35,13 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
+# MongoDB setup
 db = MongoClient(os.getenv("MONGO_URI"))["spotiswipe"]
 collection = db["users_data"]
 
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+
 
 # Global variables for token management
 global_access_token = None
@@ -260,44 +261,58 @@ def get_genres():
 def user_login():
     """Create a new user session"""
     try:
-
         data = request.get_json()
 
         if not data.get('name'):
             return jsonify({'error': 'Name is required'}), 400
-        # Create session for user
-        session_id = str(uuid.uuid4)
+
+        # Generate a proper session ID
+        session_id = str(uuid.uuid4())
+        
+        # Create user document in MongoDB
+        user_data = {
+            "session_id": session_id,
+            "name": data.get('name'),
+            "email": data.get('email'),
+            "preferences": [],  # Initialize empty preferences array
+            "genres": [],      # Initialize empty genres array
+            "created_at": datetime.now(),
+            "last_updated": datetime.now()
+        }
+        
+        # Insert into MongoDB
+        collection.insert_one(user_data)
+
+        # Create session in memory
         user_sessions[session_id] = {
             'name': data['name'],
             'genres': [],
             'liked_songs': []
         }
 
-        collection.insert_one({
-            "session_id": session_id,
-            "name": data['name'],
-            "email": data['email'],
-            "preference": [],
-            "timestamp": datetime.now(),
+        return jsonify({
+            'session_id': session_id,
+            'status': 'success',
+            'message': 'User session created successfully'
         })
-
-        return jsonify({'session_id': session_id})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-
-# Update the route in Flask app
 @app.route('/api/initial-songs', methods=['POST'])
 def get_initial_songs():
     """Get initial songs based on selected genres"""
     try:
         data = request.get_json()
         selected_genres = data.get('genres', [])
-
         session_id = data.get('session_id')
-        if not session_id or session_id not in user_sessions:
+
+        if not session_id:
+            return jsonify({'error': 'Session ID is required'}), 400
+
+        # Check if user exists in database
+        user = collection.find_one({"session_id": session_id})
+        if not user:
             return jsonify({'error': 'Invalid session'}), 400
         
         if not selected_genres:
@@ -308,52 +323,81 @@ def get_initial_songs():
         if not initial_songs:
             return jsonify({'error': 'No songs found for selected genres'}), 404
         
-        
+        # Update both memory session and database
         user_sessions[session_id]['genres'] = selected_genres
 
-        collection.update_one({"session_id": session_id}, {"$set": {"genres": selected_genres}})
+        # Update MongoDB with genres and timestamp
+        collection.update_one(
+            {"session_id": session_id},
+            {
+                "$set": {
+                    "genres": selected_genres,
+                    "last_updated": datetime.now()
+                }
+            }
+        )
         
         return jsonify({
             'session_id': session_id,
             'songs': initial_songs,
-            'total_songs': len(initial_songs)  # Add this to inform frontend
+            'total_songs': len(initial_songs)
         })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
 
 @app.route('/api/swipe', methods=['POST'])
 def handle_swipe():
     """Handle user's swipe action"""
     try:
-        
         data = request.get_json()
         session_id = data.get('session_id')
         song_index = data.get('song_index')
         liked = data.get('liked', False)
         
-        if not session_id or session_id not in user_sessions:
+        if not session_id:
+            return jsonify({'error': 'Session ID is required'}), 400
+
+        # Check if user exists in database
+        user = collection.find_one({"session_id": session_id})
+        if not user:
             return jsonify({'error': 'Invalid session'}), 400
-        
 
-        if liked and song_index is not None:
-            user_sessions[session_id]['liked_songs'].append(song_index)
-        
+        # Get song data
+        song_data = recommender.get_song_data(song_index)
+        if not song_data:
+            return jsonify({'error': 'Invalid song index'}), 400
 
-        song_data = {
+        # Create preference object
+        preference = {
             "track_id": song_index,
-            "song_name": recommender.get_song_data(song_index)['track_name'],
+            "song_name": song_data['track_name'],
+            "artists": song_data['artists'],
             "liked": liked,
+            "swiped_at": datetime.now()
         }
 
-        collection.update_one({"session_id": session_id}, {"$push": {"preference": song_data}})
-        
+        # Update memory session
+        if liked and song_index is not None:
+            user_sessions[session_id]['liked_songs'].append(song_index)
 
-        return jsonify({'status': 'success'})
+        # Update MongoDB - add new preference and update timestamp
+        collection.update_one(
+            {"session_id": session_id},
+            {
+                "$push": {"preferences": preference},
+                "$set": {"last_updated": datetime.now()}
+            }
+        )
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Preference recorded successfully'
+        })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 @app.route('/api/recommendations', methods=['POST'])
 def get_recommendations():
     """Get final recommendations based on liked songs"""
@@ -361,20 +405,40 @@ def get_recommendations():
         data = request.get_json()
         session_id = data.get('session_id')
         
-        if not session_id or session_id not in user_sessions:
+        if not session_id:
+            return jsonify({'error': 'Session ID is required'}), 400
+
+        # Check if user exists in database
+        user = collection.find_one({"session_id": session_id})
+        if not user:
             return jsonify({'error': 'Invalid session'}), 400
 
-        
-        liked_songs = user_sessions[session_id]['liked_songs']
+        liked_songs = user_sessions.get(session_id, {}).get('liked_songs', [])
         recommendations = recommender.generate_recommendations(liked_songs)
-        collection.update_one({"session_id": session_id}, {"$set": {"recommendations": recommendations}})
+
+        # Update MongoDB with recommendations and final timestamp
+        collection.update_one(
+            {"session_id": session_id},
+            {
+                "$set": {
+                    "recommendations": recommendations,
+                    "completed_at": datetime.now(),
+                    "last_updated": datetime.now()
+                }
+            }
+        )
         
-        # Clean up session
-        del user_sessions[session_id]
-        return jsonify({'recommendations': recommendations})
+        # Clean up memory session
+        if session_id in user_sessions:
+            del user_sessions[session_id]
+
+        return jsonify({
+            'status': 'success',
+            'recommendations': recommendations
+        })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route("/get-song-detail", methods=["POST"])
 def get_song_detail():
