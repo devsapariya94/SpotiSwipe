@@ -16,10 +16,25 @@ dotenv.load_dotenv()
 
 app = Flask(__name__)
 
-# Enable CORS all origins Access-Control-Allow-Origin
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",  # Allow all origins
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Allow all common HTTP methods
+        "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+        "expose_headers": ["Content-Range", "X-Content-Range"],
+        "supports_credentials": True,  # Allow credentials (cookies, authorization headers)
+        "max_age": 600,  # Cache preflight requests for 10 minutes
+        "send_wildcard": False  # For better security with credentials
+    }
+})
 
-
+# Optional: Add CORS headers to specific routes if needed
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 db = MongoClient(os.getenv("MONGO_URI"))["spotiswipe"]
 collection = db["users_data"]
