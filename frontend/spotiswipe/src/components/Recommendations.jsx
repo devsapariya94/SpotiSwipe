@@ -9,7 +9,7 @@ const SongItem = React.memo(({ song, index, onPlayStart, currentlyPlaying, setCu
   const [showAlert, setShowAlert] = useState(false);
   const audioRef = useRef(null);
   const isPlaying = currentlyPlaying === song.track_id;
-  const baseUrl = 'http://localhost:5000';
+  const baseUrl = 'https://backend.spotiswipe.devsdemo.co/';
 
   useEffect(() => {
     if (!audioRef.current) return;

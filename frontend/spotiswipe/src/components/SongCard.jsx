@@ -16,7 +16,7 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
   const cardRef = useRef(null);
   const audioRef = useRef(null);
 
-  const baseUrl = 'http://localhost:5000';
+  const baseUrl = 'https://backend.spotiswipe.devsdemo.co/';
 
   useEffect(() => {
     if (previewUrl && audioRef.current) {

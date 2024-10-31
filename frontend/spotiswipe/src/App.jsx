@@ -11,7 +11,7 @@ import Recommendations from './components/Recommendations'
 
 
 import ReactGA from 'react-ga4';
-ReactGA.initialize('YOUR_MEASUREMENT_ID');
+ReactGA.initialize('G-SKM6JZG57Z');
 
 export default function App() {
   const [step, setStep] = useState('registration')
@@ -21,7 +21,7 @@ export default function App() {
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
   const [recommendations, setRecommendations] = useState([])
 
-  const baseUrl = 'http://localhost:5000'
+  const baseUrl = 'https://backend.spotiswipe.devsdemo.co/'
 
   const handleRegistration = async (data) => {
     try {

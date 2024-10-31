@@ -49,7 +49,7 @@ const GenreSelection = ({ onStart }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const baseUrl = 'http://localhost:5000';
+    const baseUrl = 'https://backend.spotiswipe.devsdemo.co/';
 
     const fetchGenres = async () => {
       try {
