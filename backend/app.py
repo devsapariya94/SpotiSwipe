@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, render_template
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 import pandas as pd
 import numpy as np
 from collections import defaultdict
@@ -15,7 +15,11 @@ from pymongo import MongoClient
 dotenv.load_dotenv()
 
 app = Flask(__name__)
+
+# Enable CORS all origins Access-Control-Allow-Origin
 CORS(app)
+
+
 
 db = MongoClient(os.getenv("MONGO_URI"))["spotiswipe"]
 collection = db["users_data"]
@@ -26,6 +30,8 @@ SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 # Global variables for token management
 global_access_token = None
 token_expiry = None
+
+
 
 def get_access_token():
     """Get a new Spotify access token"""
@@ -230,12 +236,14 @@ user_sessions = {}
 
 
 @app.route('/api/genres', methods=['GET'])
+@cross_origin()
 def get_genres():
     """Get list of unique genres"""
     return jsonify({'genres': list(recommender.unique_genres)})
 
 
 @app.route('/api/user-login', methods=['POST'])
+@cross_origin()
 def user_login():
     """Create a new user session"""
     try:
@@ -269,6 +277,7 @@ def user_login():
 
 # Update the route in Flask app
 @app.route('/api/initial-songs', methods=['POST'])
+@cross_origin()
 def get_initial_songs():
     """Get initial songs based on selected genres"""
     try:
@@ -303,6 +312,7 @@ def get_initial_songs():
 
 
 @app.route('/api/swipe', methods=['POST'])
+@cross_origin()
 def handle_swipe():
     """Handle user's swipe action"""
     try:
@@ -334,6 +344,7 @@ def handle_swipe():
         return jsonify({'error': str(e)}), 500
     
 @app.route('/api/recommendations', methods=['POST'])
+@cross_origin()
 def get_recommendations():
     """Get final recommendations based on liked songs"""
     try:
@@ -356,6 +367,7 @@ def get_recommendations():
 
 
 @app.route("/get-song-detail", methods=["POST"])
+@cross_origin()
 def get_song_detail():
     """Get song thumbnail from Spotify API"""
     try:
