@@ -17,7 +17,7 @@ dotenv.load_dotenv()
 app = Flask(__name__)
 
 # Enable CORS all origins Access-Control-Allow-Origin
-CORS(app)
+CORS(app, origins="https://spotiswipe.devsdemo.co/")
 
 
 
