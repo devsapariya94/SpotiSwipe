@@ -128,6 +128,20 @@ class MusicRecommender:
                     normalized_data[column] = self.data[column].apply(lambda x: 0)
         return normalized_data
 
+    def _calculate_average_features(self, indices):
+        """Calculate average features for a list of song indices"""
+        if not indices:
+            return {col: 0 for col in self.feature_columns}
+        
+        sums = {col: 0 for col in self.feature_columns}
+        count = len(indices)
+        
+        for idx in indices:
+            for col in self.feature_columns:
+                sums[col] += self.data_normalized.loc[idx][col]
+        
+        return {col: sums[col] / count for col in self.feature_columns}
+    
     def _calculate_cosine_similarity(self, features1, features2):
         """Calculate Cosine similarity between two feature vectors"""
         dot_product = sum(f1 * f2 for f1, f2 in zip(features1, features2))
