@@ -226,7 +226,7 @@ class MusicRecommender:
             return []
 
     def get_initial_songs(self, selected_genres, n_songs=20):
-        """Get initial songs that match any of the selected genres"""
+        """Get initial songs that match any of the selected genres with random shuffling"""
         try:
             # Filter songs by selected genres
             genre_songs = []
@@ -241,19 +241,19 @@ class MusicRecommender:
             if not genre_songs:
                 return []
             
-            # Sort by popularity and select top N songs
-            genre_songs.sort(key=lambda x: x[1], reverse=True)
+            # Shuffle all genre songs
+            import random
+            random.shuffle(genre_songs)
+            
+            # Trim to the top n_songs
             selected_songs = [song[0] for song in genre_songs[:n_songs]]
             
-            # Shuffle the selected songs
-            import random
-            random.shuffle(selected_songs)
-            
-            return selected_songs[:n_songs]
+            return selected_songs
 
         except Exception as e:
             print(f"Error in get_initial_songs: {e}")
             return []
+
         
     def get_song_data(self, track_id):
         """Get song data by track_id"""
