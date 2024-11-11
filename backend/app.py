@@ -107,31 +107,57 @@ class MusicRecommender:
             'acousticness', 'instrumentalness', 'liveness', 
             'valence', 'tempo'
         ]
-        self.index_mapping = {idx: i for i, idx in enumerate(self.data.index)}
         self.data_normalized = self._normalize_features()
-
+        
+        # Co-occurrence matrix for collaborative filtering
+        self.co_occurrence_matrix = {}
+    
     def _normalize_features(self):
         """Normalize all numerical features to 0-1 range"""
         normalized_data = self.data.copy()
         for column in self.feature_columns:
-            if column == 'loudness':  # Special handling for loudness due to negative values
-                max_abs = max(abs(self.data[column].min()), abs(self.data[column].max()))
-                normalized_data[column] = (self.data[column] + max_abs) / (2 * max_abs)
+            if column == 'loudness':
+                max_abs = max(abs(min(self.data[column])), abs(max(self.data[column])))
+                normalized_data[column] = self.data[column].apply(lambda x: (x + max_abs) / (2 * max_abs))
             else:
-                min_val = self.data[column].min()
-                max_val = self.data[column].max()
+                min_val = min(self.data[column])
+                max_val = max(self.data[column])
                 if max_val - min_val > 0:
-                    normalized_data[column] = (self.data[column] - min_val) / (max_val - min_val)
+                    normalized_data[column] = self.data[column].apply(lambda x: (x - min_val) / (max_val - min_val))
                 else:
-                    normalized_data[column] = 0
+                    normalized_data[column] = self.data[column].apply(lambda x: 0)
         return normalized_data
 
-    def generate_recommendations(self, liked_songs_indices, n_recommendations=50):
-        """Generate recommendations based on liked songs"""
+    def _calculate_cosine_similarity(self, features1, features2):
+        """Calculate Cosine similarity between two feature vectors"""
+        dot_product = sum(f1 * f2 for f1, f2 in zip(features1, features2))
+        magnitude1 = sum(f1 ** 2 for f1 in features1) ** 0.5
+        magnitude2 = sum(f2 ** 2 for f2 in features2) ** 0.5
+        if magnitude1 * magnitude2 == 0:
+            return 0
+        return dot_product / (magnitude1 * magnitude2)
+
+    def _update_co_occurrence_matrix(self, liked_songs_indices):
+        """Update co-occurrence matrix based on liked songs"""
+        for i, song1 in enumerate(liked_songs_indices):
+            if song1 not in self.co_occurrence_matrix:
+                self.co_occurrence_matrix[song1] = {}
+            for j, song2 in enumerate(liked_songs_indices):
+                if i != j:
+                    if song2 not in self.co_occurrence_matrix[song1]:
+                        self.co_occurrence_matrix[song1][song2] = 0
+                    self.co_occurrence_matrix[song1][song2] += 1
+
+    def generate_recommendations(self, liked_songs_indices, n_recommendations=25, use_cosine_similarity=True):
+        """Generate recommendations based on liked songs using hybrid recommendation approach"""
         try:
             if not liked_songs_indices:
                 return []
             
+            # Update the co-occurrence matrix
+            self._update_co_occurrence_matrix(liked_songs_indices)
+            
+            # Convert track_ids to dataframe indices
             liked_indices = []
             for track_id in liked_songs_indices:
                 try:
@@ -143,18 +169,34 @@ class MusicRecommender:
             if not liked_indices:
                 return []
             
-            liked_features = self.data_normalized.loc[liked_indices][self.feature_columns].mean()
+            # Calculate average features of liked songs
+            avg_features = self._calculate_average_features(liked_indices)
             
+            # Calculate similarities for all songs
             similarities = []
             for idx in self.data_normalized.index:
                 if idx not in liked_indices:
-                    similarity = 1 / (1 + np.linalg.norm(
-                        self.data_normalized.loc[idx][self.feature_columns] - liked_features
-                    ))
+                    current_features = [self.data_normalized.loc[idx][col] for col in self.feature_columns]
+                    avg_features_list = [avg_features[col] for col in self.feature_columns]
+                    
+                    if use_cosine_similarity:
+                        similarity = self._calculate_cosine_similarity(current_features, avg_features_list)
+                    else:
+                        distance = self._calculate_euclidean_distance(current_features, avg_features_list)
+                        similarity = 1 / (1 + distance)
+                    
                     similarities.append((idx, similarity))
             
+            # Sort by similarity and get top recommendations
             similarities.sort(key=lambda x: x[1], reverse=True)
             recommended_indices = [idx for idx, _ in similarities[:n_recommendations]]
+            
+            # Include collaborative recommendations from co-occurrence matrix
+            for liked_idx in liked_indices:
+                if liked_idx in self.co_occurrence_matrix:
+                    for co_idx, freq in sorted(self.co_occurrence_matrix[liked_idx].items(), key=lambda x: x[1], reverse=True):
+                        if co_idx not in recommended_indices and len(recommended_indices) < n_recommendations:
+                            recommended_indices.append(co_idx)
             
             recommendations = self.data.loc[recommended_indices].to_dict('records')
             
@@ -166,42 +208,48 @@ class MusicRecommender:
             return recommendations
             
         except Exception as e:
-
+            print(f"Error in generate_recommendations: {e}")
             return []
 
-    def get_initial_songs(self, selected_genres, n_songs=10):
+    def get_initial_songs(self, selected_genres, n_songs=20):
         """Get initial songs that match any of the selected genres"""
         try:
-            genre_songs = self.data[self.data['genre_list'].apply(
-                lambda x: any(genre in x for genre in selected_genres)
-            )]
+            # Filter songs by selected genres
+            genre_songs = []
+            for idx, row in self.data.iterrows():
+                if any(genre in row['genre_list'] for genre in selected_genres):
+                    song_dict = row.to_dict()
+                    song_dict['index'] = song_dict['track_id']
+                    song_dict['track_genre'] = ', '.join(song_dict['genre_list'])
+                    del song_dict['genre_list']
+                    genre_songs.append((song_dict, song_dict['popularity']))
             
-            if genre_songs.empty:
+            if not genre_songs:
                 return []
-                
-            genre_songs = genre_songs.sort_values('popularity', ascending=False)
-            songs_per_genre = max(1, n_songs // len(selected_genres))
-            initial_songs = []
             
-            for genre in selected_genres:
-                genre_specific = genre_songs[genre_songs['genre_list'].apply(lambda x: genre in x)]
-                available_songs = min(len(genre_specific), songs_per_genre)
-                initial_songs.extend(genre_specific.head(available_songs).to_dict('records'))
+            # Sort by popularity and select top N songs
+            genre_songs.sort(key=lambda x: x[1], reverse=True)
+            selected_songs = [song[0] for song in genre_songs[:n_songs]]
             
-            np.random.shuffle(initial_songs)
+            # Shuffle the selected songs
+            import random
+            random.shuffle(selected_songs)
             
-            for song in initial_songs:
-                song['track_genre'] = ', '.join(song['genre_list'])
-                del song['genre_list']
-            
-            return initial_songs[:n_songs]
+            return selected_songs[:n_songs]
 
         except Exception as e:
+            print(f"Error in get_initial_songs: {e}")
             return []
         
-    def get_song_data(self,track_id):
-        return self.data[self.data['track_id'] == track_id].to_dict('records')[0]
-
+    def get_song_data(self, track_id):
+        """Get song data by track_id"""
+        try:
+            song = self.data[self.data['track_id'] == track_id].iloc[0].to_dict()
+            song['track_genre'] = ', '.join(song['genre_list'])
+            del song['genre_list']
+            return song
+        except:
+            return None
 
 # Update data loading and cleaning
 try:
@@ -507,4 +555,4 @@ def get_song_detail():
 
     
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,  host="0.0.0.0")
