@@ -182,10 +182,10 @@ const Recommendations = ({ songs, onRestart }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full"
+      className="w-full flex flex-col items-center"
     >
-      <h2 className="text-2xl font-bold text-white mb-6">Your Personalized Recommendations</h2>
-      <div className="space-y-4 mb-6">
+      <h2 className="text-2xl font-bold text-white mb-6 text-center">Your Personalized Recommendations</h2>
+      <div className="space-y-4 mb-6 w-full max-w-3xl">
         {songs.map((song, index) => (
           <SongItem 
             key={song.track_id} 
@@ -199,11 +199,13 @@ const Recommendations = ({ songs, onRestart }) => {
       </div>
       <button
         onClick={onRestart}
-        className="w-full p-4 rounded-lg bg-green-500 text-white font-semibold 
+        className="w-full max-w-3xl p-4 rounded-lg bg-green-500 text-white font-semibold 
           transition-all duration-300 hover:bg-green-600 flex items-center justify-center gap-2"
       >
         <Redo2 size={20} /> Start Over
       </button>
+
+      <h5 className="text-1xl font-bold text-white mt-6 mb-6 text-center">There can be some error since it is a custom ML model</h5>
     </motion.div>
   );
 };

@@ -223,10 +223,12 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
     return null;
   }
 
-
-
   return (
     <div className="relative w-full max-w-md mx-auto">
+      <div className="text-center mb-4 text-purple-300 text-2xl">
+        🔊 Turn up your volume for the best experience!
+      </div>
+      
       <div className="text-center mb-6 text-purple-300">
         Use the <span className="bg-red-500/80 px-2 py-1 rounded">left arrow key</span> or 
         swipe left to dislike, <span className="bg-green-500/80 px-2 py-1 rounded">right arrow key</span> or 
@@ -388,7 +390,6 @@ const SongCard = ({ song, onSwipe, currentIndex, totalSongs }) => {
               <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : null}
-
         </div>
 
         {/* Preference Overlays */}
